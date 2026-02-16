@@ -5,8 +5,95 @@ const shuffle = require('../utils/shuffle');
 // Card Deck: 4 groups of 4 identical cards (Values: A, K, Q, J)
 const BASE_DECK = ['A', 'A', 'A', 'A', 'K', 'K', 'K', 'K', 'Q', 'Q', 'Q', 'Q', 'J', 'J', 'J', 'J'];
 
+const roomTimers = {}; // roomCode -> timeoutId
+
+const clearRoomTimer = (roomCode) => {
+  if (roomTimers[roomCode]) {
+    clearTimeout(roomTimers[roomCode]);
+    delete roomTimers[roomCode];
+  }
+};
+
 module.exports = (io, socket) => {
-  
+
+  const startTurnTimer = async (roomCode, turnPlayerId) => {
+    clearRoomTimer(roomCode);
+
+    const duration = 20000; // 20 seconds
+    const timerStart = Date.now();
+
+    // Emit timer start to clients
+    io.to(roomCode).emit('timerUpdate', { 
+      turnPlayerId,
+      timerStart,
+      duration 
+    });
+
+    roomTimers[roomCode] = setTimeout(async () => {
+      console.log(`[${roomCode}] Timer expired for ${turnPlayerId}. Auto-passing.`);
+      await handleAutoPass(roomCode, turnPlayerId);
+    }, duration);
+  };
+
+  const handleAutoPass = async (roomCode, expectedTurnPlayerId) => {
+    try {
+      const room = await Room.findOne({ roomCode }).populate('players');
+      if (!room || room.gameState !== 'PLAYING') return;
+
+      const currentPlayer = room.players[room.turnIndex];
+      
+      // Safety check: ensure turn hasn't changed race condition
+      if (currentPlayer._id.toString() !== expectedTurnPlayerId.toString()) return;
+
+      // Pick Random Card
+      if (currentPlayer.cards.length === 0) return; // Should not happen
+      const randomCardIndex = Math.floor(Math.random() * currentPlayer.cards.length);
+      const cardToPass = currentPlayer.cards[randomCardIndex];
+
+      await executePass(room, cardToPass, currentPlayer);
+
+    } catch (err) {
+      console.error(`Error in auto-pass for room ${roomCode}:`, err);
+    }
+  };
+
+  const executePass = async (room, card, fromPlayer) => {
+      const fromPlayerIndex = room.players.findIndex(p => p._id.equals(fromPlayer._id));
+      if (fromPlayerIndex === -1) return;
+
+      const toPlayerIndex = (fromPlayerIndex + 1) % 4;
+      const toPlayer = room.players[toPlayerIndex];
+
+      // Remove from sender
+      const cardIdx = fromPlayer.cards.indexOf(card);
+      if (cardIdx > -1) {
+        fromPlayer.cards.splice(cardIdx, 1);
+        await fromPlayer.save();
+      }
+
+      // Add to receiver
+      toPlayer.cards.push(card);
+      await toPlayer.save();
+
+      // Notify updates
+      io.to(fromPlayer.socketId).emit('updateHand', { cards: fromPlayer.cards });
+      io.to(toPlayer.socketId).emit('updateHand', { cards: toPlayer.cards });
+
+      // Update Turn
+      room.turnIndex = toPlayerIndex;
+      await room.save();
+
+      const nextPlayer = room.players[toPlayerIndex];
+      
+      io.to(room.roomCode).emit('updateTurn', { 
+        turnPlayerId: nextPlayer._id,
+        lastAction: `Passed a card to ${toPlayer.username}`
+      });
+
+      // Start Timer for Next Player
+      startTurnTimer(room.roomCode, nextPlayer._id);
+  };
+
   // Start Game
   socket.on('startFourKindGame', async ({ roomCode }) => {
     try {
@@ -27,7 +114,7 @@ module.exports = (io, socket) => {
 
       // 3. Set Turn (Circular)
       room.gameState = 'PLAYING';
-      room.turnIndex = 0; // Starts with player 0 (Host usually)
+      room.turnIndex = 0; 
       await room.save();
 
       // 4. Emit Game Start
@@ -38,12 +125,13 @@ module.exports = (io, socket) => {
         io.to(p.socketId).emit('updateHand', { cards: p.cards });
       }
 
-      // 6. Emit Turn Info
+      // 6. Emit Turn & Start Timer
       const currentTurnPlayer = room.players[0];
       io.to(roomCode).emit('updateTurn', { 
         turnPlayerId: currentTurnPlayer._id,
-        isFirstTurn: true // Special flag for first move handling
+        isFirstTurn: true
       });
+      startTurnTimer(roomCode, currentTurnPlayer._id);
 
     } catch (err) {
       console.error(err);
@@ -56,49 +144,17 @@ module.exports = (io, socket) => {
       const room = await Room.findOne({ roomCode }).populate('players');
       if (!room) return;
 
-      const fromPlayerIndex = room.players.findIndex(p => p._id.toString() === fromPlayerId);
-      if (fromPlayerIndex === -1) return;
+      // Reset timer immediately to prevent auto-pass firing during processing
+      clearRoomTimer(roomCode);
 
-      // Calculate Next Player (Circular)
-      const toPlayerIndex = (fromPlayerIndex + 1) % 4;
-      const fromPlayer = room.players[fromPlayerIndex];
-      const toPlayer = room.players[toPlayerIndex];
+      const fromPlayer = room.players.find(p => p._id.toString() === fromPlayerId);
+      if (!fromPlayer) return;
 
-      // Remove card from sender
-      const cardIdx = fromPlayer.cards.indexOf(card);
-      if (cardIdx > -1) {
-        fromPlayer.cards.splice(cardIdx, 1);
-        await fromPlayer.save();
-      }
+      // Validate turn
+      const currentTurnPlayer = room.players[room.turnIndex];
+      if (currentTurnPlayer._id.toString() !== fromPlayerId) return;
 
-      // Add to receiver (as incoming or direct?)
-      // For simplicity/speed: Add directly to hand. 
-      // User must then have 5 cards and discard 1.
-      toPlayer.cards.push(card);
-      await toPlayer.save();
-
-      // Notify updates
-      io.to(fromPlayer.socketId).emit('updateHand', { cards: fromPlayer.cards });
-      io.to(toPlayer.socketId).emit('updateHand', { cards: toPlayer.cards });
-
-      // Check Win Condition for Receiver?
-      // Usually you check win when you have 4 matching.
-      // But now they have 5. They need to discard to win? 
-      // Or if they have 4 matching + 1 extra?
-      // Let's check if any 4 cards match.
-      // Actually standard rule: You pass, then you check? 
-      // Or you receive, check, then pass?
-      // "Goal: First player to have all 4 same cards wins"
-      // If I have A A A A K, I win? Yes.
-
-      // Update Turn
-      room.turnIndex = toPlayerIndex;
-      await room.save();
-
-      io.to(roomCode).emit('updateTurn', { 
-        turnPlayerId: toPlayer._id,
-        lastAction: `Passed a card to ${toPlayer.username}`
-      });
+      await executePass(room, card, fromPlayer);
 
     } catch (err) {
       console.error(err);
@@ -112,70 +168,50 @@ module.exports = (io, socket) => {
          const room = await Room.findOne({ roomCode });
          
          if (!player || !room) return;
-         
-         // Basic validation (must have at least 4 cards)
          if (player.cards.length < 4) return;
          
-         // Check counts
          const counts = {};
          player.cards.forEach(c => counts[c] = (counts[c] || 0) + 1);
-         
-         // If any card has count 4
          const hasFourOfKind = Object.values(counts).some(count => count >= 4);
          
          if (hasFourOfKind) {
-             // 1. Update Room State
+             clearRoomTimer(roomCode); // Stop timer
+
              room.gameState = 'FINISHED';
-             
-             // 2. Add to History
-             // We need to keep only last 5? Or all? Let's keep all for now.
              room.gameHistory.push({
                  winner: player.username,
                  timestamp: new Date()
              });
              await room.save();
 
-             // 3. Emit Game Over
              io.to(roomCode).emit('gameOver', { 
                  winner: player.username,
                  cards: player.cards,
                  history: room.gameHistory
              });
-         } else {
-             // False claim logic? For now just ignore or toast error to user socket
-             // socket.emit('error', 'Not a valid hand!');
          }
      } catch (err) {
          console.error(err);
      }
   });
 
-  // Next Round (Winner starts)
+  // Next Round
   socket.on('nextFourKindRound', async ({ roomCode }) => {
       try {
         const room = await Room.findOne({ roomCode }).populate('players');
         if (!room || room.players.length !== 4) return;
 
-        // 1. Shuffle Deck
         let deck = shuffle([...BASE_DECK]);
-
-        // 2. Distribute 4 cards to each player
         const updates = [];
         room.players.forEach((player, index) => {
             player.cards = deck.slice(index * 4, (index + 1) * 4);
-            player.incomingCard = null; // Clear any pending
+            player.incomingCard = null; 
             updates.push(player.save());
         });
         await Promise.all(updates);
 
-        // 3. Reset Game State
         room.gameState = 'PLAYING';
         
-        // Winner should start? 
-        // Need to find winner index.
-        // Or just start with random/circular?
-        // User asked: "winning player must start the game"
-        // We know the winner from history?
         if (room.gameHistory.length > 0) {
             const lastWinnerName = room.gameHistory[room.gameHistory.length - 1].winner;
             const winnerIndex = room.players.findIndex(p => p.username === lastWinnerName);
@@ -190,7 +226,6 @@ module.exports = (io, socket) => {
 
         await room.save();
 
-        // 4. Emit Events
         io.to(roomCode).emit('fourKindGameStarted');
         
         for (const p of room.players) {
@@ -202,9 +237,13 @@ module.exports = (io, socket) => {
             turnPlayerId: currentTurnPlayer._id,
             isFirstTurn: true 
         });
+        startTurnTimer(roomCode, currentTurnPlayer._id);
 
       } catch (err) {
           console.error(err);
       }
   });
+
+  // Cleanup on disconnect (optional)
+  // socket.on('disconnect', ...) // handled in main index.js, but we might want to clear timers if room empty
 };

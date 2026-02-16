@@ -128,9 +128,19 @@ export const GameProvider = ({ children }) => {
     });
 
     newSocket.on('updateTurn', ({ turnPlayerId, lastAction }) => {
-        // You might want to store turnPlayerId in gameState
-        setGameState(prev => ({ ...prev, turn: turnPlayerId }));
+        setGameState(prev => ({ 
+            ...prev, 
+            turn: turnPlayerId 
+        }));
         if (lastAction) toast(lastAction);
+    });
+
+    newSocket.on('timerUpdate', ({ turnPlayerId, timerStart, duration }) => {
+        setGameState(prev => ({
+            ...prev,
+            turn: turnPlayerId, // Ensure turn is synced
+            timer: { start: timerStart, duration }
+        }));
     });
 
     newSocket.on('gameOver', ({ winner, cards, history }) => {
@@ -139,7 +149,8 @@ export const GameProvider = ({ children }) => {
             gameStatus: 'FINISHED',
             roundWinner: winner,
             winnerCards: cards,
-            gameHistory: history // Update history for Scorecard
+            gameHistory: history,
+            timer: null // Clear timer
         }));
         toast.success(`Game Over! Winner: ${winner}`);
     });

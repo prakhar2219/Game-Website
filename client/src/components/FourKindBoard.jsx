@@ -6,6 +6,50 @@ import Chat from './Chat';
 import Scorecard from './Scorecard';
 import confetti from 'canvas-confetti';
 import useVideoChat from '../hooks/useVideoChat';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const TimerRing = ({ duration, start, isTurn }) => {
+    const [progress, setProgress] = useState(100);
+    
+    useEffect(() => {
+        if (!start || !duration) return;
+        
+        const interval = setInterval(() => {
+            const elapsed = Date.now() - start;
+            const remaining = Math.max(0, duration - elapsed);
+            const displayProgress = (remaining / duration) * 100;
+            setProgress(displayProgress);
+
+            if (remaining <= 0) clearInterval(interval);
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, [start, duration]);
+
+    if (!isTurn) return null;
+
+    return (
+        <div className="absolute inset-0 z-0 pointer-events-none">
+             <svg className="w-full h-full transform -rotate-90 scale-110" viewBox="0 0 100 100">
+                 <circle
+                     cx="50" cy="50" r="48"
+                     fill="none"
+                     stroke="#374151"
+                     strokeWidth="4"
+                 />
+                 <motion.circle
+                     cx="50" cy="50" r="48"
+                     fill="none"
+                     stroke={progress < 20 ? "#EF4444" : "#14B8A6"}
+                     strokeWidth="4"
+                     strokeDasharray="301.59"
+                     strokeDashoffset={301.59 * (1 - progress / 100)}
+                     strokeLinecap="round"
+                 />
+             </svg>
+        </div>
+    );
+};
 
 const VideoStream = ({ stream, isLocal, isMuted }) => {
     const videoRef = useRef(null);
@@ -175,64 +219,81 @@ const FourKindBoard = () => {
               return (
                 <div key={p._id} className={`absolute ${getPositionStyle(i)} flex flex-col items-center transition-all duration-500 z-10`}>
                     
-                    {/* Player Avatar / Video */}
-                    <div className={`
-                        relative w-32 h-32 md:w-40 md:h-40 rounded-2xl overflow-hidden shadow-2xl border-4
-                        ${isTurn ? 'border-teal-500 shadow-teal-500/30 scale-105' : 'border-gray-700 bg-gray-800'}
-                        transition-all duration-300 group
-                    `}>
-                        {stream ? (
-                             <VideoStream stream={stream} isLocal={isMe} />
-                        ) : (
-                             <div className="w-full h-full bg-gray-800 flex flex-col items-center justify-center">
-                                 <User className="text-gray-500 mb-2" size={40} />
-                                 <p className="text-xs text-gray-500">No Video</p>
-                             </div>
-                        )}
+                <div key={p._id} className={`absolute ${getPositionStyle(i)} flex flex-col items-center transition-all duration-500 z-10`}>
+                    
+                    {/* Player Avatar / Video with Timer */}
+                    <div className="relative">
+                        <TimerRing 
+                             duration={gameState.timer?.duration} 
+                             start={gameState.timer?.start} 
+                             isTurn={isTurn} 
+                        />
+                        
+                        <div className={`
+                            relative w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden shadow-2xl border-4
+                            ${isTurn ? 'border-transparent shadow-teal-500/30 scale-105' : 'border-gray-700 bg-gray-800'}
+                            transition-all duration-300 group
+                        `}>
+                            {stream ? (
+                                <VideoStream stream={stream} isLocal={isMe} />
+                            ) : (
+                                <div className="w-full h-full bg-gray-800 flex flex-col items-center justify-center">
+                                    <User className="text-gray-500 mb-2" size={40} />
+                                    <p className="text-xs text-gray-500">No Video</p>
+                                </div>
+                            )}
 
-                        {/* Name Overlay */}
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm p-2 text-center">
-                           <span className={`text-sm font-bold truncate block ${isTurn ? 'text-teal-400' : 'text-gray-200'}`}>
-                                {p.username} {isMe && '(You)'}
-                           </span>
+                             {/* Name Overlay */}
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm p-2 text-center">
+                               <span className={`text-sm font-bold truncate block ${isTurn ? 'text-teal-400' : 'text-gray-200'}`}>
+                                    {p.username} {isMe && '(You)'}
+                               </span>
+                            </div>
+
+                            {/* Controls for Local User */}
+                            {isMe && (
+                               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 p-1 rounded-lg">
+                                   <button onClick={toggleMute} className={`p-1.5 rounded-full ${isMuted ? 'bg-red-500' : 'bg-gray-600 hover:bg-gray-500'}`}>
+                                       {isMuted ? <MicOff size={14} /> : <Mic size={14} />}
+                                   </button>
+                                   <button onClick={toggleVideo} className={`p-1.5 rounded-full ${isVideoOff ? 'bg-red-500' : 'bg-gray-600 hover:bg-gray-500'}`}>
+                                       {isVideoOff ? <VideoOff size={14} /> : <Video size={14} />}
+                                   </button>
+                               </div>
+                            )}
+                            {!isMe && (
+                                 <div className="absolute -top-2 -right-2 w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center text-sm font-bold text-white shadow ring-4 ring-[#0a0b1e] z-10">
+                                     ?
+                                 </div>
+                            )}
                         </div>
-
-                        {/* Controls for Local User */}
-                        {isMe && (
-                           <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 p-1 rounded-lg">
-                               <button onClick={toggleMute} className={`p-1.5 rounded-full ${isMuted ? 'bg-red-500' : 'bg-gray-600 hover:bg-gray-500'}`}>
-                                   {isMuted ? <MicOff size={14} /> : <Mic size={14} />}
-                               </button>
-                               <button onClick={toggleVideo} className={`p-1.5 rounded-full ${isVideoOff ? 'bg-red-500' : 'bg-gray-600 hover:bg-gray-500'}`}>
-                                   {isVideoOff ? <VideoOff size={14} /> : <Video size={14} />}
-                               </button>
-                           </div>
-                        )}
-                        {!isMe && (
-                             <div className="absolute -top-2 -right-2 w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center text-sm font-bold text-white shadow ring-4 ring-[#0a0b1e]">
-                                 ?
-                             </div>
-                        )}
                     </div>
 
                     {/* My Cards */}
                     {isMe && (
-                        <div className="flex space-x-3 mt-6 perspective-1000">
-                            {cards.map((card, idx) => (
-                                <button 
-                                    key={idx}
-                                    onClick={() => handlePassCard(card)}
-                                    disabled={!isTurn}
-                                    className={`
-                                        w-20 h-32 md:w-24 md:h-36 bg-white rounded-xl shadow-2xl border-2 border-gray-300
-                                        flex items-center justify-center text-4xl md:text-5xl font-black text-gray-800
-                                        transform transition-all duration-200
-                                        ${isTurn ? 'hover:-translate-y-6 hover:rotate-2 cursor-pointer hover:shadow-teal-500/50 hover:border-teal-400' : 'opacity-80 cursor-not-allowed grayscale'}
-                                    `}
-                                >
-                                    {card}
-                                </button>
-                            ))}
+                        <div className="flex space-x-3 mt-6 perspective-1000 min-h-[160px]">
+                            <AnimatePresence>
+                                {cards.map((card, idx) => (
+                                    <motion.button 
+                                        key={`${card}-${idx}`} // Unique key for animation
+                                        layout
+                                        initial={{ opacity: 0, y: 50, scale: 0.5 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -50, scale: 0.5, transition: { duration: 0.2 } }}
+                                        whileHover={{ y: -20, rotate: 2, scale: 1.1 }}
+                                        onClick={() => handlePassCard(card)}
+                                        disabled={!isTurn}
+                                        className={`
+                                            w-20 h-32 md:w-24 md:h-36 bg-white rounded-xl shadow-2xl border-2 border-gray-300
+                                            flex items-center justify-center text-4xl md:text-5xl font-black text-gray-800
+                                            cursor-pointer transform-gpu
+                                            ${isTurn ? 'hover:shadow-teal-500/50 hover:border-teal-400' : 'opacity-80 cursor-not-allowed grayscale'}
+                                        `}
+                                    >
+                                        {card}
+                                    </motion.button>
+                                ))}
+                            </AnimatePresence>
                         </div>
                     )}
                 </div>
