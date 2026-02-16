@@ -24,6 +24,13 @@ const Room = () => {
           desc: 'Fast-paced card passing madness',
           icon: Layers, // or Grid2X2
           gradient: 'from-teal-400 to-emerald-500'
+      },
+      {
+          id: 'ipl_draft',
+          title: 'IPL Spinner Draft',
+          desc: 'Build your dream 15-man squad',
+          icon: Trophy,
+          gradient: 'from-blue-600 to-indigo-700'
       }
   ];
 

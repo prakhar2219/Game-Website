@@ -42,6 +42,8 @@ io.on('connection', (socket) => {
   gameHandler(io, socket);
   videoHandler(io, socket);
   fourKindHandler(io, socket);
+  const iplDraftHandler = require('./sockets/iplDraftHandler');
+  iplDraftHandler(io, socket);
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
