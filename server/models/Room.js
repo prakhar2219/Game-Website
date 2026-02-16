@@ -3,8 +3,6 @@ const mongoose = require('mongoose');
 const RoomSchema = new mongoose.Schema({
   roomCode: { type: String, required: true, unique: true },
   players: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Player' }],
-  gameState: { 
-    type: String, 
   gameState: {
     type: String,
     enum: ['WAITING', 'PICKING', 'GUESSING', 'RESULT', 'PLAYING', 'FINISHED'],

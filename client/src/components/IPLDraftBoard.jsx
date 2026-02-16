@@ -54,6 +54,14 @@ const IPLDraftBoard = () => {
     const opponent = players.find(p => p._id !== gameState.player._id);
     const mySquad = gameState.iplDraft?.squads?.[gameState.player._id] || [];
     const opponentSquad = gameState.iplDraft?.squads?.[opponent?._id] || [];
+
+    console.log('IPLDraftBoard State:', { 
+        turn: gameState.turn, 
+        myId: gameState.player._id, 
+        myTurn, 
+        spinning, 
+        showPlayerSelect 
+    });
     
     // Listen for events
     useEffect(() => {

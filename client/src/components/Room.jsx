@@ -70,7 +70,10 @@ const Room = () => {
           
           {/* Show Game Type */}
           <div className="bg-gray-900/50 p-2 rounded text-center text-sm text-gray-400 mb-2">
-              Playing: <span className="text-white font-bold">{gameState.gameType === 'four_kind' ? 'Four of a Kind' : 'Raja Mantri'}</span>
+              Playing: <span className="text-white font-bold">
+                {gameState.gameType === 'four_kind' ? 'Four of a Kind' : 
+                 gameState.gameType === 'ipl_draft' ? 'IPL Spinner Draft' : 'Raja Mantri'}
+              </span>
           </div>
 
           <ul className="space-y-2">
@@ -81,11 +84,16 @@ const Room = () => {
               </li>
             ))}
           </ul>
-          {gameState.isHost && gameState.players.length === 4 && (
+          {gameState.isHost && (
+            (gameState.gameType === 'ipl_draft' && gameState.players.length === 2) || 
+            (gameState.gameType !== 'ipl_draft' && gameState.players.length === 4)
+          ) && (
             <button 
               onClick={() => {
                   if (gameState.gameType === 'four_kind') {
                       socket.emit('startFourKindGame', { roomCode: gameState.roomCode });
+                  } else if (gameState.gameType === 'ipl_draft') {
+                      socket.emit('startIPLDraft', { roomCode: gameState.roomCode });
                   } else {
                       socket.emit('startGame', { roomCode: gameState.roomCode });
                   }
@@ -95,7 +103,10 @@ const Room = () => {
               Start Game
             </button>
           )}
-          {gameState.isHost && gameState.players.length < 4 && (
+          {gameState.isHost && (
+             (gameState.gameType === 'ipl_draft' && gameState.players.length < 2) ||
+             (gameState.gameType !== 'ipl_draft' && gameState.players.length < 4)
+          ) && (
              <p className="text-center text-gray-400 animate-pulse">Waiting for players...</p>
           )}
            {!gameState.isHost && (
