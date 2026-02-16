@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { toast } from 'react-hot-toast';
-import { PlusCircle, LogIn, Users, BookOpen, Crown, Layers, ArrowLeft } from 'lucide-react';
+import { PlusCircle, LogIn, Users, BookOpen, Crown, Layers, ArrowLeft, Trophy } from 'lucide-react';
 
 const Room = () => {
   const { socket, gameState, setGameState } = useGame(); // Added setGameState to manually update gameType if needed locally

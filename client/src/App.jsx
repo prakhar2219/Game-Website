@@ -3,6 +3,7 @@ import { GameProvider, useGame } from './context/GameContext';
 import Room from './components/Room';
 import GameBoard from './components/GameBoard';
 
+import FourKindBoard from './components/FourKindBoard';
 import IPLDraftBoard from './components/IPLDraftBoard';
 
 const AppContent = () => {

@@ -219,8 +219,6 @@ const FourKindBoard = () => {
               return (
                 <div key={p._id} className={`absolute ${getPositionStyle(i)} flex flex-col items-center transition-all duration-500 z-10`}>
                     
-                <div key={p._id} className={`absolute ${getPositionStyle(i)} flex flex-col items-center transition-all duration-500 z-10`}>
-                    
                     {/* Player Avatar / Video with Timer */}
                     <div className="relative">
                         <TimerRing 
