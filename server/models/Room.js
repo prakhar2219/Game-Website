@@ -13,10 +13,7 @@ const RoomSchema = new mongoose.Schema({
 
   // Raja Mantri Specific
   roles: [String],
-  pickedRoles: [{
-    playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
-    role: String
-  }],
+  pickedRoles: { type: Number, default: 0 },
 
   // Four of a Kind Specific
   gameHistory: [{

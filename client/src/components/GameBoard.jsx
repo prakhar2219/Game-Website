@@ -30,15 +30,16 @@ const GameBoard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4">
-      <div className="max-w-4xl mx-auto">
-        <header className="flex justify-between items-center mb-8 bg-gray-800 p-4 rounded-lg">
+    <div className="h-screen bg-gray-900 text-white flex overflow-hidden">
+      {/* Left Side: Game Area */}
+      <div className="flex-grow flex flex-col p-4 overflow-y-auto">
+        <header className="flex justify-between items-center mb-8 bg-gray-800 p-4 rounded-lg flex-shrink-0">
           <div>
             <h1 className="text-2xl font-bold">Room: {gameState.roomCode}</h1>
              <p>Status: {gameState.gameStatus}</p>
           </div>
           <div className="text-right flex items-center gap-4">
-             <p className="text-xl font-bold text-yellow-400">My Role: {gameState.myRole || '???'}</p>
+             <p className="text-xl font-bold text-yellow-400">My Role: {gameState.myRole?.name || '???'}</p>
              <button 
                onClick={() => {
                  if (confirm('Are you sure you want to leave?')) {
@@ -79,7 +80,7 @@ const GameBoard = () => {
                   <div key={p._id} className="flex flex-col items-center">
                     <Card 
                       role={p._id === gameState.player._id ? gameState.myRole : null} 
-                      isRevealed={p._id === gameState.player._id && !!gameState.myRole} 
+                      isRevealed={p._id === gameState.player._id && !!gameState.myRole?.name} 
                       onClick={() => {
                         if (p._id === gameState.player?._id) {
                             handlePick();
@@ -89,7 +90,7 @@ const GameBoard = () => {
                     <div className="mt-4 text-center">
                       <p className="font-bold text-lg">{p.username}</p>
                       <p className="text-yellow-400">Score: {p.totalPoints}</p>
-                      {p._id === gameState.player._id && gameState.myRole && (
+                      {p._id === gameState.player._id && gameState.myRole?.name && (
                         <p className="text-green-400 text-sm">(You)</p>
                       )}
                     </div>
@@ -101,7 +102,7 @@ const GameBoard = () => {
            {gameState.gameStatus === 'GUESSING' && (
              <div className="w-full max-w-md bg-gray-800 p-6 rounded-lg text-center">
                 <h2 className="text-2xl mb-4">Guessing Phase</h2>
-                {gameState.myRole === 'Sipahi' ? (
+                {gameState.myRole?.name === 'Sipahi' ? (
                   <div className="space-y-4">
                     <p className="text-lg">Who is the Chor?</p>
                     <select 
@@ -219,7 +220,10 @@ const GameBoard = () => {
            )}
 
         </main>
+      </div>
 
+      {/* Right Side: Chat Sidebar */}
+      <div className="w-80 h-full border-l border-gray-700 bg-gray-900 flex-shrink-0">
         <Chat />
       </div>
     </div>

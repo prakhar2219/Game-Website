@@ -27,7 +27,15 @@ const TeamBadge = ({ team, size = 'md' }) => {
 const PlayerCard = ({ player, compact = false }) => (
     <div className={`relative bg-gray-800 rounded-lg overflow-hidden border border-gray-700 ${compact ? 'w-24' : 'w-32'} flex-shrink-0`}>
         <div className={`${compact ? 'h-24' : 'h-32'} bg-gray-700 relative`}>
-             <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+             <img 
+                src={player.image} 
+                alt={player.name} 
+                onError={(e) => {
+                    e.target.onerror = null; 
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name)}&background=random&color=fff`;
+                }}
+                className="w-full h-full object-cover" 
+             />
              <div className="absolute top-1 right-1">
                  <TeamBadge team={player.team} size="sm" />
              </div>
@@ -120,6 +128,21 @@ const IPLDraftBoard = () => {
             {/* BACKGROUND */}
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30 pointer-events-none"></div>
 
+            {/* LEAVE BUTTON */}
+            <button 
+                onClick={() => {
+                    if (confirm('Are you sure you want to leave?')) {
+                        socket.emit('leaveRoom', { roomCode: gameState.roomCode, playerId: gameState.player._id });
+                        localStorage.removeItem('rmcs_roomCode');
+                        localStorage.removeItem('rmcs_playerId');
+                        window.location.reload();
+                    }
+                }}
+                className="absolute top-4 right-4 z-50 bg-red-600/80 hover:bg-red-700 p-2 rounded-lg text-white font-bold text-sm flex items-center gap-2 border border-red-500 transition-all hover:scale-105 shadow-lg"
+            >
+                <X size={16} /> LEAVE
+            </button>
+
             {/* LEFT/CENTER: Spinner Area */}
             <div className="flex-grow flex flex-col items-center justify-center relative p-8">
                 
@@ -155,34 +178,30 @@ const IPLDraftBoard = () => {
                              </div>
                          ))}
                          
-                         {/* Center Knob */}
-                         <div className="absolute inset-0 m-auto w-24 h-24 bg-gradient-to-br from-gray-700 to-gray-900 rounded-full border-4 border-gray-600 shadow-xl flex items-center justify-center z-10">
-                             <Trophy className="text-yellow-500" />
-                         </div>
+                         {/* Center Knob / Spin Button */}
+                         <button
+                            onClick={handleSpin}
+                            disabled={!myTurn || spinning}
+                            className={`
+                                absolute inset-0 m-auto w-32 h-32 rounded-full border-4 shadow-xl z-10
+                                flex flex-col items-center justify-center
+                                transition-all duration-300
+                                ${myTurn && !spinning
+                                    ? 'bg-gradient-to-br from-yellow-500 to-orange-600 border-yellow-300 scale-110 animate-pulse cursor-pointer hover:scale-125' 
+                                    : 'bg-gradient-to-br from-gray-700 to-gray-900 border-gray-600 cursor-not-allowed grayscale'}
+                            `}
+                         >
+                             <Trophy className={`w-10 h-10 ${myTurn && !spinning ? 'text-white' : 'text-gray-500'}`} />
+                             <span className={`text-xs font-black mt-1 ${myTurn && !spinning ? 'text-white' : 'text-gray-500'}`}>
+                                 {spinning ? '...' : myTurn ? 'SPIN' : 'WAIT'}
+                             </span>
+                         </button>
                      </motion.div>
 
                      {/* Indicator */}
                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 text-red-500 z-20">
                          ▼
                      </div>
-
-                     {/* Spin Button */}
-                     {!spinning && !showPlayerSelect && (
-                         <button 
-                            onClick={handleSpin}
-                            disabled={!myTurn}
-                            className={`
-                                absolute bottom-[-4rem] left-1/2 transform -translate-x-1/2 
-                                px-8 py-3 rounded-full font-black text-xl shadow-lg border-2
-                                transition-all hover:scale-105 active:scale-95
-                                ${myTurn 
-                                    ? 'bg-gradient-to-r from-yellow-500 to-orange-600 text-black border-yellow-300 animate-bounce' 
-                                    : 'bg-gray-700 text-gray-400 border-gray-600 cursor-not-allowed'}
-                            `}
-                         >
-                            {myTurn ? "SPIN NOW!" : "WAITING..."}
-                         </button>
-                     )}
 
                      {/* Result Display */}
                      {!spinning && spinResult && !showPlayerSelect && (
@@ -238,7 +257,14 @@ const IPLDraftBoard = () => {
                 <div className="flex-grow overflow-y-auto p-4 space-y-3">
                     {opponentSquad.map((p, i) => (
                          <div key={i} className="flex items-center gap-3 bg-gray-800 p-2 rounded border border-gray-700 opacity-70">
-                             <img src={p.image} className="w-10 h-10 rounded object-cover" />
+                             <img 
+                                src={p.image} 
+                                onError={(e) => {
+                                    e.target.onerror = null; 
+                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random&color=fff`;
+                                }}
+                                className="w-10 h-10 rounded object-cover" 
+                             />
                              <div>
                                  <p className="text-sm font-bold text-gray-300">{p.name}</p>
                                  <div className="flex items-center gap-1">
@@ -279,17 +305,25 @@ const IPLDraftBoard = () => {
                                      <button 
                                         key={p.id}
                                         onClick={() => handlePick(p)}
-                                        className="bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-yellow-500 transition-all rounded-xl overflow-hidden group text-left relative"
+                                        className="bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-yellow-500 transition-all rounded-xl overflow-hidden group text-left relative flex flex-col"
                                      >
-                                         <div className="h-40 bg-gray-700 relative overflow-hidden">
-                                             <img src={p.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                                         <div className="h-40 bg-gray-700 relative overflow-hidden flex-shrink-0">
+                                             <img 
+                                                 src={p.image} 
+                                                 alt={p.name}
+                                                 onError={(e) => {
+                                                     e.target.onerror = null; 
+                                                     e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random&color=fff&size=256`;
+                                                 }}
+                                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform" 
+                                             />
                                              <div className="absolute top-2 right-2">
                                                  <span className="bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-md border border-white/10">{p.role}</span>
                                              </div>
                                          </div>
-                                         <div className="p-4">
-                                             <h3 className="font-bold text-lg leading-tight group-hover:text-yellow-400">{p.name}</h3>
-                                             <p className="text-sm text-gray-500 mt-1">{p.team}</p>
+                                         <div className="p-4 flex-grow flex flex-col justify-center">
+                                             <h3 className="font-bold text-lg leading-tight text-white group-hover:text-yellow-400">{p.name}</h3>
+                                             <p className="text-sm text-gray-400 mt-1">{p.team}</p>
                                          </div>
                                      </button>
                                  ))}

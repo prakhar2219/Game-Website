@@ -66,7 +66,7 @@ const Room = () => {
       <div className="flex flex-col items-center justify-center h-screen bg-[#0a0b1e] text-white">
         <h1 className="text-4xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-600">Room: {gameState.roomCode}</h1>
         <div className="bg-gray-800 p-8 rounded-lg shadow-xl w-96 space-y-4 border border-gray-700">
-          <h2 className="text-2xl font-semibold">Players ({gameState.players.length}/4)</h2>
+          <h2 className="text-2xl font-semibold">Players ({gameState.players.length}/{gameState.gameType === 'ipl_draft' ? 2 : 4})</h2>
           
           {/* Show Game Type */}
           <div className="bg-gray-900/50 p-2 rounded text-center text-sm text-gray-400 mb-2">

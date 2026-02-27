@@ -70,7 +70,8 @@ module.exports = (io, socket) => {
       if (!room) {
         return socket.emit('error', 'Room not found');
       }
-      if (room.players.length >= 4) {
+      const maxPlayers = room.gameType === 'ipl_draft' ? 2 : 4;
+      if (room.players.length >= maxPlayers) {
         return socket.emit('error', 'Room is full');
       }
 
@@ -167,7 +168,16 @@ module.exports = (io, socket) => {
       // We can use socket.emit (since 'socket' is the sender)
       // verify socket.id matches player.socketId just in case
       
-      socket.emit('revealRole', { role: player.currRole });
+      const ROLES_MAP = {
+        'Raja': 1000,
+        'Mantri': 800,
+        'Sipahi': 500,
+        'Chor': 0
+      };
+
+      socket.emit('revealRole', { 
+        role: { name: player.currRole, points: ROLES_MAP[player.currRole] } 
+      });
       
       // If all 4 picked, move to reveal/guessing
       // But we can't trust client to tell us "I picked". We should track it.
@@ -201,9 +211,14 @@ module.exports = (io, socket) => {
          // We might want to reveal Raja and Mantri publicly now?
          // Or just send the state 'GUESSING' and let clients show "Sipahi is guessing"
          
-         io.to(roomCode).emit('updateGameState', { gameState: 'GUESSING', players: players }); // Be careful not to leak Chor/Sipahi if you send all players with roles
-         // Sanitize players before sending?
-         // For now, simpler: Just send state change.
+         const sanitizedPlayers = players.map(p => ({
+           _id: p._id,
+           username: p.username,
+           totalPoints: p.totalPoints
+           // We intentionally omit currRole and currPoints here
+         }));
+         
+         io.to(roomCode).emit('updateGameState', { gameState: 'GUESSING', players: sanitizedPlayers });
       } else {
         io.to(roomCode).emit('playerPicked', { playerId }); // Update UI to show this player has picked
       }
