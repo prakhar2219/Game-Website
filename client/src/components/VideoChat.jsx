@@ -10,8 +10,6 @@ const VideoChat = () => {
   const [remoteStreams, setRemoteStreams] = useState({}); // Map of userId -> MediaStream
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
-  const [audioDevices, setAudioDevices] = useState([]);
-  const [selectedAudioId, setSelectedAudioId] = useState('');
 
   const localVideoRef = useRef(null);
   const peersRef = useRef({}); // Keep track of peers in ref to avoid stale state in callbacks
@@ -28,16 +26,6 @@ const VideoChat = () => {
 
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
-        }
-
-        // Get Audio Devices
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const audioInputs = devices.filter(device => device.kind === 'audioinput');
-        setAudioDevices(audioInputs);
-        const currentAudioTrack = stream.getAudioTracks()[0];
-        if (currentAudioTrack) {
-            const settings = currentAudioTrack.getSettings();
-            setSelectedAudioId(settings.deviceId);
         }
 
         // Join video room
@@ -204,45 +192,6 @@ const VideoChat = () => {
       }
   };
 
-  const handleAudioChange = async (e) => {
-      const deviceId = e.target.value;
-      if (deviceId === selectedAudioId) return;
-
-      try {
-          const newStream = await navigator.mediaDevices.getUserMedia({ 
-              audio: { deviceId: { exact: deviceId } },
-              video: false
-          });
-          const newAudioTrack = newStream.getAudioTracks()[0];
-
-          if (streamRef.current) {
-              const oldAudioTrack = streamRef.current.getAudioTracks()[0];
-              if (oldAudioTrack) {
-                  oldAudioTrack.stop();
-                  streamRef.current.removeTrack(oldAudioTrack);
-              }
-              streamRef.current.addTrack(newAudioTrack);
-              
-              // Sync mute state
-              newAudioTrack.enabled = !isMuted;
-              
-              setLocalStream(streamRef.current); // Update state to trigger re-renders if needed
-
-              // Replace track in all peer connections
-              Object.values(peersRef.current).forEach(peer => {
-                  const sender = peer.getSenders().find(s => s.track && s.track.kind === 'audio');
-                  if (sender) {
-                      sender.replaceTrack(newAudioTrack);
-                  }
-              });
-          }
-          setSelectedAudioId(deviceId);
-      } catch (err) {
-          console.error('Error switching microphone:', err);
-          toast.error('Failed to switch microphone');
-      }
-  };
-
   const getUsername = (id) => {
       const player = gameState.players.find(p => p._id === id);
       return player ? player.username : 'Unknown';
@@ -250,21 +199,6 @@ const VideoChat = () => {
 
   return (
     <div className="w-full max-w-4xl mx-auto mb-8">
-      <div className="flex justify-between items-center mb-4 px-4">
-        <h3 className="text-xl text-center flex-grow">Video Chat</h3>
-        <select 
-            className="bg-gray-700 text-white text-sm p-2 rounded border border-gray-600 max-w-[200px]"
-            value={selectedAudioId}
-            onChange={handleAudioChange}
-            title="Select Microphone"
-        >
-            {audioDevices.map(device => (
-                <option key={device.deviceId} value={device.deviceId}>
-                    {device.label || `Microphone ${device.deviceId.slice(0,5)}...`}
-                </option>
-            ))}
-        </select>
-      </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           
           {/* Local Video */}

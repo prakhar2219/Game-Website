@@ -34,7 +34,6 @@ const Card = ({ role, isRevealed, onClick }) => {
              />
           )}
           <div className="relative z-10 bg-black/50 w-full text-center py-2 mt-auto">
-             <span className="text-xl font-bold text-white block drop-shadow-md">{role?.name}</span>
              <span className="text-lg text-yellow-300 font-black drop-shadow-md">{role?.points} pts</span>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Card from './Card';
 import Chat from './Chat';
+import Scoreboard from './Scoreboard';
 import VideoChat from './VideoChat';
 import { useGame } from '../context/GameContext';
 
@@ -30,16 +31,18 @@ const GameBoard = () => {
   };
 
   return (
-    <div className="h-screen bg-gray-900 text-white flex overflow-hidden">
-      {/* Left Side: Game Area */}
-      <div className="flex-grow flex flex-col p-4 overflow-y-auto">
-        <header className="flex justify-between items-center mb-8 bg-gray-800 p-4 rounded-lg flex-shrink-0">
+    <div className="h-screen bg-gray-950 p-4 gap-4 text-white flex overflow-hidden">
+      {/* Left Side: Game Area Panel */}
+      <div className="flex-grow flex flex-col bg-gray-900/80 backdrop-blur rounded-xl border border-gray-700 overflow-hidden">
+        <header className="p-4 bg-gray-800 border-b border-gray-700 flex justify-between items-center flex-shrink-0">
           <div>
-            <h1 className="text-2xl font-bold">Room: {gameState.roomCode}</h1>
-             <p>Status: {gameState.gameStatus}</p>
+            <h1 className="text-xl font-bold text-gray-200">Room: {gameState.roomCode}</h1>
+             <p className="text-sm text-gray-400">Status: {gameState.gameStatus}</p>
           </div>
           <div className="text-right flex items-center gap-4">
-             <p className="text-xl font-bold text-yellow-400">My Role: {gameState.myRole?.name || '???'}</p>
+             <p className="text-sm font-bold text-yellow-500 bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20">
+               My Role: {gameState.myRole?.name || '???'}
+             </p>
              <button 
                onClick={() => {
                  if (confirm('Are you sure you want to leave?')) {
@@ -49,7 +52,7 @@ const GameBoard = () => {
                    window.location.reload();
                  }
                }}
-               className="bg-red-600 hover:bg-red-700 text-sm px-3 py-1 rounded"
+               className="bg-red-600 hover:bg-red-700 text-sm px-3 py-1.5 rounded-lg transition-colors font-medium"
              >
                Leave Room
              </button>
@@ -60,7 +63,7 @@ const GameBoard = () => {
                      socket.emit('endGame', { roomCode: gameState.roomCode });
                    }
                  }}
-                 className="bg-red-800 hover:bg-red-900 text-sm px-3 py-1 rounded border border-red-500"
+                 className="bg-red-900/50 hover:bg-red-900/80 text-red-200 text-sm px-3 py-1.5 rounded-lg border border-red-800 transition-colors font-medium"
                >
                  End Game
                </button>
@@ -68,8 +71,8 @@ const GameBoard = () => {
           </div>
         </header>
 
-        {/* Game Area */}
-        <main className="flex flex-col items-center space-y-8">
+        {/* Game Area Content */}
+        <main className="flex-grow overflow-y-auto p-6 flex flex-col items-center space-y-8">
            
            <VideoChat />
 
@@ -222,9 +225,14 @@ const GameBoard = () => {
         </main>
       </div>
 
-      {/* Right Side: Chat Sidebar */}
-      <div className="w-80 h-full border-l border-gray-700 bg-gray-900 flex-shrink-0">
-        <Chat />
+      {/* Right Side: Scoreboard & Chat Sidebar */}
+      <div className="w-80 h-full flex-shrink-0 flex flex-col gap-4">
+        <div className="flex-1 min-h-0">
+           <Scoreboard />
+        </div>
+        <div className="flex-1 min-h-0">
+           <Chat />
+        </div>
       </div>
     </div>
   );
