@@ -9,36 +9,37 @@ const Scoreboard = () => {
   const sortedPlayers = [...(gameState.players || [])].sort((a, b) => b.totalPoints - a.totalPoints);
 
   return (
-    <div className="flex flex-col h-full bg-gray-900/80 backdrop-blur rounded-xl border border-gray-700 overflow-hidden">
+    <div className="flex flex-col h-full bg-[#1a1225] border border-[#3a2a4b] rounded-2xl overflow-hidden shadow-2xl">
       {/* Header */}
-      <div className="p-3 bg-gray-800 border-b border-gray-700 flex items-center gap-2">
-        <Trophy size={18} className="text-yellow-400" />
-        <h3 className="font-bold text-gray-200">Scoreboard</h3>
+      <div className="p-4 border-b border-[#3a2a4b]/60 flex items-center gap-2 relative">
+        <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#e2c792]/20 to-transparent"></div>
+        <Trophy size={16} className="text-[#e2c792]" />
+        <h3 className="text-sm font-cinzel text-[#e2c792] tracking-widest uppercase">SCOREBOARD</h3>
       </div>
 
       {/* Scores Table */}
-      <div className="flex-grow overflow-y-auto p-4">
+      <div className="flex-grow overflow-y-auto p-4 custom-scrollbar">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-gray-700 text-gray-400 text-sm">
+            <tr className="border-b border-[#3a2a4b]/50 text-gray-400 text-xs tracking-wider uppercase">
               <th className="pb-2">Player</th>
               <th className="pb-2 text-right">Points</th>
             </tr>
           </thead>
           <tbody>
             {sortedPlayers.map((p, idx) => (
-              <tr key={p._id} className="border-b border-gray-800/50">
+              <tr key={p._id} className="border-b border-[#3a2a4b]/30">
                 <td className="py-2">
                   <div className="flex items-center gap-2">
                      <span className={`font-bold ${idx === 0 ? 'text-yellow-400' : 'text-gray-300'}`}>
                        #{idx + 1}
                      </span>
-                     <span className={`text-sm ${p._id === gameState.player?._id ? 'text-teal-400 font-bold' : 'text-gray-200'}`}>
+                     <span className={`text-sm ${p._id === gameState.player?._id ? 'text-[#e2c792] font-bold tracking-wide' : 'text-gray-200'}`}>
                        {p.username}
                      </span>
                   </div>
                 </td>
-                <td className={`py-2 text-right font-black ${idx === 0 ? 'text-yellow-400' : 'text-white'}`}>
+                <td className={`py-3 text-right font-black ${idx === 0 ? 'text-[#e2c792]' : 'text-white'}`}>
                   {p.totalPoints}
                 </td>
               </tr>

@@ -198,11 +198,21 @@ const VideoChat = () => {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto mb-8">
+    <div className="w-full bg-[#1a1225] border border-[#3a2a4b] rounded-2xl p-6 shadow-2xl relative">
+      <div className="flex justify-between items-center mb-6 pt-2 pb-4 border-b border-[#3a2a4b]/60">
+        <h2 className="text-xl font-cinzel text-[#e2c792] tracking-[0.2em] flex items-center gap-3">
+           {/* Simple custom icon representation for lounge */}
+           <svg className="w-5 h-5 text-[#e2c792]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+           </svg>
+           VIDEO LOUNGE
+        </h2>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           
           {/* Local Video */}
-          <div className="relative aspect-video bg-black rounded-lg overflow-hidden shadow-lg border-2 border-green-500">
+          <div className="relative aspect-video bg-[#140d1c] rounded-lg overflow-hidden shadow-lg border border-[#e2c792]/30">
             <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover transform scale-x-[-1]" />
             <div className="absolute bottom-2 left-2 text-sm text-white bg-black bg-opacity-60 px-2 py-1 rounded">
                 {gameState.player?.username || 'You'} (Me)
@@ -249,7 +259,7 @@ const VideoChat = () => {
           {gameState.players
              .filter(p => p._id !== gameState.player._id && !remoteStreams[p._id])
              .map(p => (
-                 <div key={p._id} className="relative aspect-video bg-gray-800 rounded-lg overflow-hidden shadow-lg border border-gray-700 flex items-center justify-center">
+                 <div key={p._id} className="relative aspect-video bg-[#140d1c] rounded-lg overflow-hidden shadow-lg border border-[#3a2a4b] flex items-center justify-center">
                     <div className="text-center">
                         <div className="w-12 h-12 bg-gray-700 rounded-full mx-auto mb-2 flex items-center justify-center animate-pulse">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-gray-400">
@@ -274,7 +284,7 @@ const VideoPlayer = ({ stream, username }) => {
     }, [stream]);
 
     return (
-        <div className="relative aspect-video bg-black rounded-lg overflow-hidden shadow-lg border border-gray-600">
+        <div className="relative aspect-video bg-[#140d1c] rounded-lg overflow-hidden shadow-lg border border-[#3a2a4b]">
            <video ref={ref} autoPlay playsInline className="w-full h-full object-cover" />
            <div className="absolute bottom-2 left-2 text-sm text-white bg-black bg-opacity-60 px-2 py-1 rounded">
                {username}

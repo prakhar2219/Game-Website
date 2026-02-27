@@ -11,18 +11,18 @@ const Card = ({ role, isRevealed, onClick }) => {
         style={{ transformStyle: 'preserve-3d' }}
       >
         {/* Front (Hidden) */}
-        <div className="absolute w-full h-full bg-gray-900 rounded-lg backface-hidden flex items-center justify-center border-4 border-white shadow-lg overflow-hidden">
+        <div className="absolute w-full h-full bg-gradient-to-b from-[#3a1c2e] to-[#160d1b] rounded-xl backface-hidden flex items-center justify-center border border-[#523d6a]/80 shadow-2xl overflow-hidden hover:border-[#e2c792]/50 transition-colors p-2">
           <img 
              src="/images/logo.png" 
              alt="Logo" 
-             className="w-full h-full object-cover"
+             className="w-full h-full object-contain opacity-90 drop-shadow-[0_0_15px_rgba(226,199,146,0.3)]"
              onError={(e) => { e.target.style.display = 'none'; }} 
           />
         </div>
 
         {/* Back (Revealed) */}
         <div 
-          className="absolute w-full h-full bg-white rounded-lg backface-hidden flex flex-col items-center justify-center border-4 border-yellow-400 shadow-lg overflow-hidden"
+          className="absolute w-full h-full bg-[#1a1225] rounded-xl backface-hidden flex flex-col items-center justify-center border border-[#e2c792] shadow-2xl overflow-hidden"
           style={{ transform: 'rotateY(180deg)' }}
         >
           {role?.name && (
