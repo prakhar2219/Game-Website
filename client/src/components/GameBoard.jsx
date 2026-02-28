@@ -125,8 +125,8 @@ const GameBoard = () => {
            )}
 
            {gameState.gameStatus === 'GUESSING' && (
-             <div className="w-full flex-grow flex items-center justify-center">
-               <div className="w-full max-w-md bg-[#1a1225] border border-[#3a2a4b] p-8 rounded-2xl text-center shadow-2xl">
+             <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#09050e]/80 backdrop-blur-md p-4">
+               <div className="w-full max-w-md bg-[#1a1225] border border-[#e2c792]/50 p-8 rounded-2xl text-center shadow-[0_0_50px_rgba(0,0,0,0.8)]">
                   <h2 className="text-3xl font-playfair text-white tracking-wide mb-6">Guessing Phase</h2>
                   {gameState.myRole?.name === 'Sipahi' ? (
                     <div className="space-y-6">
@@ -151,15 +151,15 @@ const GameBoard = () => {
                       </button>
                     </div>
                   ) : (
-                    <p className="text-xl font-sans text-gray-400 animate-pulse tracking-wide">Sipahi is guessing...</p>
+                    <p className="text-xl font-sans text-[#e2c792] animate-pulse tracking-wide font-medium">Sipahi is guessing...</p>
                   )}
                </div>
              </div>
            )}
 
            {gameState.gameStatus === 'RESULT' && (
-             <div className="w-full flex-grow flex items-center justify-center">
-               <div className="w-full max-w-2xl bg-[#1a1225] border border-[#3a2a4b] p-8 rounded-2xl text-center space-y-6 shadow-2xl">
+             <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#09050e]/80 backdrop-blur-md p-4">
+               <div className="w-full max-w-2xl bg-[#1a1225] border border-[#e2c792]/50 p-8 rounded-2xl text-center space-y-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] max-h-[90vh] overflow-y-auto custom-scrollbar">
                   {/* ... existing result code ... */}
                   <h2 className="text-4xl font-playfair font-bold text-[#e2c792] tracking-wide">Round Over!</h2>
                   <p className="text-xl text-white font-sans">
@@ -210,8 +210,8 @@ const GameBoard = () => {
            )}
 
            {gameState.gameStatus === 'GAME_OVER' && (
-              <div className="w-full flex-grow flex items-center justify-center">
-                <div className="w-full max-w-2xl flex flex-col items-center justify-center p-12 bg-[#1a1225] border border-[#3a2a4b] rounded-2xl shadow-2xl text-center space-y-8">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#09050e]/90 backdrop-blur-lg p-4">
+                <div className="w-full max-w-2xl flex flex-col items-center justify-center p-12 bg-[#1a1225] border border-[#e2c792]/60 rounded-2xl shadow-[0_0_50px_rgba(226,199,146,0.15)] text-center space-y-8 max-h-[95vh] overflow-y-auto custom-scrollbar">
                    <h1 className="text-5xl font-playfair font-black text-transparent bg-clip-text bg-gradient-to-r from-[#e2c792] to-[#c79a42] tracking-wider drop-shadow-lg">
                       GAME OVER
                    </h1>
