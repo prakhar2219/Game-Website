@@ -41,7 +41,7 @@ export const GameProvider = ({ children }) => {
       setGameState(prev => ({ ...prev, players }));
     });
 
-    newSocket.on('joinedRoom', ({ roomCode, isHost, playerId, gameType, gameHistory, iplDraft }) => {
+    newSocket.on('joinedRoom', ({ roomCode, isHost, playerId, gameType, gameHistory, iplDraft, currentTurn }) => {
       // Save session
       localStorage.setItem('rmcs_roomCode', roomCode);
       localStorage.setItem('rmcs_playerId', playerId);
@@ -53,21 +53,23 @@ export const GameProvider = ({ children }) => {
         player: { _id: playerId }, // minimal player info
         gameType: gameType || 'raja_mantri',
         gameHistory: gameHistory || [],
-        iplDraft: iplDraft || {} // Store IPL Draft data
+        iplDraft: iplDraft || {}, // Store IPL Draft data if provided
+        turn: currentTurn != null ? String(currentTurn) : prev.turn
       }));
     });
 
     // ...
 
-    newSocket.on('iplDraftStarted', ({ squads, currentTurn }) => {
+    newSocket.on('iplDraftStarted', ({ squads, teamCounts, currentTurn }) => {
          setGameState(prev => ({
              ...prev,
              gameStatus: 'PLAYING',
              iplDraft: {
                  ...prev.iplDraft,
-                 squads
+                 squads,
+                 teamCounts
              },
-             turn: currentTurn
+             turn: currentTurn != null ? String(currentTurn) : prev.turn
          }));
     });
 
@@ -80,7 +82,7 @@ export const GameProvider = ({ children }) => {
                  teamCounts,
                  availablePlayersCount
              },
-             turn: nextTurn
+             turn: nextTurn != null ? String(nextTurn) : prev.turn
          }));
     });
 

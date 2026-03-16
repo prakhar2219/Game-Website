@@ -24,13 +24,11 @@ const RoomSchema = new mongoose.Schema({
   // IPL Spinner Draft Specific
   iplDraft: {
      squads: {
-         type: Map,
-         of: [Object], // Array of player objects {name, team, role, image}
+         type: Object, // { [playerId]: [ { name, team, role, image } ] }
          default: {}
      },
      teamCounts: {
-         type: Map,
-         of: Map, // playerID -> { "CSK": 1, "MI": 2 }
+         type: Object, // { [playerId]: { "CSK": 1, "MI": 2 } }
          default: {}
      },
      availablePlayers: [String], // Array of playerIDs

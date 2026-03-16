@@ -1,4 +1,5 @@
 const Room = require('../models/Room');
+const Player = require('../models/Player');
 const iplPlayers = require('../data/iplPlayers');
 
 const TEAMS = ['CSK', 'MI', 'RCB', 'KKR', 'GT', 'SRH', 'LSG', 'DC', 'RR', 'PBKS'];
@@ -11,14 +12,17 @@ module.exports = (io, socket) => {
       const room = await Room.findOne({ roomCode }).populate('players');
       if (!room || room.players.length !== 2) return; // Strict 2 player check
 
-      // Initialize Squads
+      // Initialize Squads and Team Limits (max 2 per team per player)
       const squads = {};
       const teamCounts = {};
       
       room.players.forEach(p => {
-        squads[p._id] = [];
-        teamCounts[p._id] = {};
-        TEAMS.forEach(t => teamCounts[p._id][t] = 0);
+        const pid = p._id.toString();
+        squads[pid] = [];
+        teamCounts[pid] = {};
+        TEAMS.forEach(t => {
+          teamCounts[pid][t] = 0;
+        });
       });
 
       // Initialize Game State
@@ -33,13 +37,15 @@ module.exports = (io, socket) => {
           spinning: false
         }
       };
-      
+      room.markModified('iplDraft');
+
       room.turnIndex = 0;
       await room.save();
 
       io.to(roomCode).emit('iplDraftStarted', { 
-        squads, 
-        currentTurn: room.players[0]._id 
+        squads,
+        teamCounts,
+        currentTurn: room.players[0]._id.toString()
       });
 
     } catch (err) {
@@ -53,10 +59,21 @@ module.exports = (io, socket) => {
       const room = await Room.findOne({ roomCode });
       if (!room) return;
 
-      const player = room.players[room.turnIndex];
-      const playerTeamCounts = room.iplDraft.teamCounts.get(player.toString());
+      // Enforce turn on the server side based on socket
+      const requestingPlayer = await Player.findOne({ roomCode, socketId: socket.id });
+      if (!requestingPlayer) return;
 
-      // Filter available teams (Count < 2)
+      const currentTurnPlayerId = room.players[room.turnIndex].toString();
+      if (requestingPlayer._id.toString() !== currentTurnPlayerId) {
+        socket.emit('error', 'Not your turn to spin.');
+        return;
+      }
+
+      const player = room.players[room.turnIndex];
+      const playerId = player.toString();
+      const playerTeamCounts = room.iplDraft.teamCounts?.[playerId] || {};
+
+      // Filter available teams (Count < 2) for this player
       const availableTeams = TEAMS.filter(t => (playerTeamCounts?.[t] || 0) < 2);
       
       // Add "ANY" option? (Maybe always available or weighted?)
@@ -77,7 +94,7 @@ module.exports = (io, socket) => {
       // Emit Spin Event (Client handles animation)
       io.to(roomCode).emit('wheelSpinning', { 
         result: randomTeam,
-        playerId: player 
+        playerId: playerId
       });
 
       // Reset spinning flag after delay (handled by pick or timeout?)
@@ -94,15 +111,16 @@ module.exports = (io, socket) => {
       const room = await Room.findOne({ roomCode });
       if (!room) return;
 
-      let availableIds = room.iplDraft.availablePlayers;
+      const availableIds = room.iplDraft.availablePlayers || [];
       let teamPlayers = [];
 
       if (team === 'ANY') {
-          // Flatten all available players
-          teamPlayers = iplPlayers.filter(p => availableIds.includes(p.id));
-      } else {
-          teamPlayers = iplPlayers.filter(p => p.team === team && availableIds.includes(p.id));
+        // "ANY" should not directly return all players; the client will first
+        // ask the user to pick a specific team, then call this again with that team.
+        return;
       }
+
+      teamPlayers = iplPlayers.filter(p => p.team === team && availableIds.includes(p.id));
 
       socket.emit('teamPlayersList', { team, players: teamPlayers });
 
@@ -121,29 +139,52 @@ module.exports = (io, socket) => {
       const turnPlayer = room.players[room.turnIndex];
       if (turnPlayer._id.toString() !== playerId) return;
 
-      // Update Squad
-      const currentSquad = room.iplDraft.squads.get(playerId) || [];
-      if (currentSquad.length >= 15) return; // Max 15 validation
+      // Plain JS objects for squads and teamCounts
+      const squadsContainer = room.iplDraft.squads || {};
+      const teamCountsContainer = room.iplDraft.teamCounts || {};
 
-      room.iplDraft.squads.set(playerId, [...currentSquad, playerObj]);
+      const existingSquad = squadsContainer[playerId] || [];
 
-      // Update Team Count
-      const currentCounts = room.iplDraft.teamCounts.get(playerId);
+      if (existingSquad.length >= 15) return; // Max 15 validation
+
+      const existingCounts = teamCountsContainer[playerId] || {};
+
       const team = playerObj.team;
-      currentCounts[team] = (currentCounts[team] || 0) + 1;
-      room.iplDraft.teamCounts.set(playerId, currentCounts);
+
+      // Enforce max 2 players per team (server-side safety)
+      if ((existingCounts[team] || 0) >= 2) {
+        socket.emit('error', 'You already have 2 players from this team.');
+        return;
+      }
+
+      const updatedSquad = [...existingSquad, playerObj];
+      const updatedCounts = {
+        ...existingCounts,
+        [team]: (existingCounts[team] || 0) + 1
+      };
+
+      squadsContainer[playerId] = updatedSquad;
+      teamCountsContainer[playerId] = updatedCounts;
+
+      room.iplDraft.squads = squadsContainer;
+      room.iplDraft.teamCounts = teamCountsContainer;
 
       // Remove from Available
       room.iplDraft.availablePlayers = room.iplDraft.availablePlayers.filter(id => id !== playerObj.id);
 
       // Check Win/End Condition (Total 15 players)
-      if (currentSquad.length + 1 >= 15 && room.players.every(p => {
-          if (p._id.toString() === playerId) return true; // this player just reached 15
-          return (room.iplDraft.squads.get(p._id.toString()) || []).length >= 15;
+      if (updatedSquad.length >= 15 && room.players.every(p => {
+          const pid = p._id.toString();
+          if (pid === playerId) return true; // this player just reached 15
+          const otherSquad = squadsContainer[pid] || [];
+          return otherSquad.length >= 15;
       })) {
           room.gameState = 'FINISHED';
           await room.save();
-          io.to(roomCode).emit('iplDraftFinished', { squads: Object.fromEntries(room.iplDraft.squads) });
+          room.markModified('iplDraft');
+          await room.save();
+
+          io.to(roomCode).emit('iplDraftFinished', { squads: squadsContainer });
           return;
       }
 
@@ -153,14 +194,14 @@ module.exports = (io, socket) => {
       
       // Clear Spinner
       room.iplDraft.currentSpinner = { team: null, spinning: false };
-      
+      room.markModified('iplDraft');
       await room.save();
 
       io.to(roomCode).emit('updateIPLDraft', {
-        squads: Object.fromEntries(room.iplDraft.squads),
-        teamCounts: Object.fromEntries(room.iplDraft.teamCounts),
+        squads: squadsContainer,
+        teamCounts: teamCountsContainer,
         lastPick: playerObj,
-        nextTurn: room.players[nextTurnIndex]._id,
+        nextTurn: room.players[nextTurnIndex]._id.toString(),
         availablePlayersCount: room.iplDraft.availablePlayers.length
       });
 

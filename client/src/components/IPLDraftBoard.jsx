@@ -5,7 +5,22 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, Users, Shield, Zap, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-const TEAMS = ['CSK', 'MI', 'RCB', 'KKR', 'GT', 'SRH', 'LSG', 'DC', 'RR', 'PBKS', 'ANY'];
+const TEAMS = ['MI', 'KKR', 'RCB', 'LSG', 'CSK', 'GT', 'RR', 'SRH', 'ANY', 'DC', 'PBKS'];
+
+// Color palette cycling around the wheel (11 sectors)
+const SLICE_COLORS = [
+    '#facc15', // yellow
+    '#2563eb', // blue
+    '#ef4444', // red
+    '#22c55e', // green
+    '#f97316', // orange
+    '#0ea5e9', // cyan
+    '#a855f7', // purple
+    '#ec4899', // pink
+    '#6b7280', // gray (Any Team)
+    '#facc15', // repeat
+    '#2563eb'  // repeat
+];
 
 const TeamBadge = ({ team, size = 'md' }) => {
     const colors = {
@@ -55,22 +70,16 @@ const IPLDraftBoard = () => {
     const [spinning, setSpinning] = useState(false);
     const [spinResult, setSpinResult] = useState(null); // 'CSK', 'MI', etc.
     const [showPlayerSelect, setShowPlayerSelect] = useState(false);
+    const [selectionMode, setSelectionMode] = useState(null); // 'team' | 'player' | null
     const [availableTeamPlayers, setAvailableTeamPlayers] = useState([]);
     
-    // Derived state
-    const myTurn = gameState.turn === gameState.player._id;
+    // Derived state (normalize IDs for reliable turn comparison)
+    const myTurn = String(gameState.turn || '') === String(gameState.player?._id || '');
     const opponent = players.find(p => p._id !== gameState.player._id);
     const mySquad = gameState.iplDraft?.squads?.[gameState.player._id] || [];
     const opponentSquad = gameState.iplDraft?.squads?.[opponent?._id] || [];
+    const myTeamCounts = gameState.iplDraft?.teamCounts?.[gameState.player._id] || {};
 
-    console.log('IPLDraftBoard State:', { 
-        turn: gameState.turn, 
-        myId: gameState.player._id, 
-        myTurn, 
-        spinning, 
-        showPlayerSelect 
-    });
-    
     // Listen for events
     useEffect(() => {
         socket.on('wheelSpinning', ({ result, playerId }) => {
@@ -83,21 +92,30 @@ const IPLDraftBoard = () => {
                 setSpinResult(result);
                 
                 if (playerId === gameState.player._id) {
-                     // Fetch players for this team
-                     socket.emit('getPlayersForTeam', { roomCode: gameState.roomCode, team: result });
+                     // If "ANY" is rolled, let the user choose a specific team first
+                     if (result === 'ANY') {
+                         setSelectionMode('team');
+                         setShowPlayerSelect(true);
+                     } else {
+                         // Fetch players for this concrete team
+                         socket.emit('getPlayersForTeam', { roomCode: gameState.roomCode, team: result });
+                     }
                 }
             }, 3000);
         });
 
         socket.on('teamPlayersList', ({ team, players }) => {
             setAvailableTeamPlayers(players);
+            setSelectionMode('player');
             setShowPlayerSelect(true);
         });
 
         socket.on('updateIPLDraft', (data) => {
-             // GameContext should handle this generically or we do it manual here if needed
+             // GameContext updates global state; here we just clean local UI
              setShowPlayerSelect(false);
+             setSelectionMode(null);
              setSpinResult(null);
+             setAvailableTeamPlayers([]);
              toast.success(`Pick made: ${data.lastPick.name}`);
         });
 
@@ -120,6 +138,18 @@ const IPLDraftBoard = () => {
             playerId: gameState.player._id, 
             playerObj 
         });
+    };
+
+    const handleAnyTeamChoice = (team) => {
+        const takenFromTeam = myTeamCounts?.[team] || 0;
+        if (takenFromTeam >= 2) {
+            toast.error('You already have 2 players from this team.');
+            return;
+        }
+
+        setSpinResult(team);
+        setSelectionMode('player');
+        socket.emit('getPlayersForTeam', { roomCode: gameState.roomCode, team });
     };
 
     return (
@@ -161,46 +191,70 @@ const IPLDraftBoard = () => {
 
                 {/* SPINNER WHEEL */}
                 <div className="relative">
-                     {/* Wheel Circle */}
+                     {/* Outer glow ring */}
+                     <div className="absolute inset-[-12px] rounded-full bg-white/5 blur-2xl pointer-events-none" />
+
+                     {/* Wheel Circle with 11 colored sectors (like reference) */}
                      <motion.div 
-                        className="w-96 h-96 rounded-full border-8 border-gray-800 bg-gray-900 relative shadow-2xl overflow-hidden"
+                        className="w-96 h-96 rounded-full border-[10px] border-white/70 bg-gray-900 relative shadow-[0_0_40px_rgba(0,0,0,0.8)] overflow-hidden"
+                        style={{
+                            backgroundImage: `conic-gradient(${SLICE_COLORS.map((c, i) => {
+                                const start = (360 / SLICE_COLORS.length) * i;
+                                const end = (360 / SLICE_COLORS.length) * (i + 1);
+                                return `${c} ${start}deg ${end}deg`;
+                            }).join(',')})`
+                        }}
                         animate={{ rotate: spinning ? 3600 : 0 }}
                         transition={{ duration: 3, ease: "easeOut" }}
                      >
-                         {/* Render Segments (Simplified Visuals) */}
-                         {TEAMS.map((team, i) => (
-                             <div 
-                                key={team}
-                                className="absolute w-full h-full text-center"
-                                style={{ transform: `rotate(${i * (360/TEAMS.length)}deg)` }}
-                             >
-                                 <div className="mt-4 text-xs font-bold text-gray-500">{team}</div>
-                             </div>
-                         ))}
+                         {/* Team labels near the circumference of each sector */}
+                         {TEAMS.map((team, i) => {
+                             const sliceAngle = 360 / TEAMS.length;
+                             const midAngle = sliceAngle * i + sliceAngle / 2;
+                             return (
+                                 <div
+                                     key={team}
+                                     className="absolute inset-0 flex items-center justify-center"
+                                     style={{ transform: `rotate(${midAngle}deg)` }}
+                                 >
+                                     <span
+                                         className="text-sm font-bold tracking-wide text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+                                         style={{ 
+                                             // slightly inward from the rim so text isn't at the very top edge
+                                             transform: 'translateY(-145px) rotate(-90deg)',
+                                             whiteSpace: 'nowrap'
+                                         }}
+                                     >
+                                         {team === 'ANY' ? 'Any Team' : team}
+                                     </span>
+                                 </div>
+                             );
+                         })}
                          
                          {/* Center Knob / Spin Button */}
                          <button
                             onClick={handleSpin}
                             disabled={!myTurn || spinning}
                             className={`
-                                absolute inset-0 m-auto w-32 h-32 rounded-full border-4 shadow-xl z-10
+                                absolute inset-0 m-auto w-32 h-32 rounded-full border-[6px] shadow-xl z-10
                                 flex flex-col items-center justify-center
                                 transition-all duration-300
                                 ${myTurn && !spinning
-                                    ? 'bg-gradient-to-br from-yellow-500 to-orange-600 border-yellow-300 scale-110 animate-pulse cursor-pointer hover:scale-125' 
-                                    : 'bg-gradient-to-br from-gray-700 to-gray-900 border-gray-600 cursor-not-allowed grayscale'}
+                                    ? 'bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-600 border-yellow-200 scale-110 animate-pulse cursor-pointer hover:scale-125' 
+                                    : 'bg-gradient-to-br from-slate-600 to-slate-800 border-slate-500 cursor-not-allowed grayscale'}
                             `}
                          >
-                             <Trophy className={`w-10 h-10 ${myTurn && !spinning ? 'text-white' : 'text-gray-500'}`} />
-                             <span className={`text-xs font-black mt-1 ${myTurn && !spinning ? 'text-white' : 'text-gray-500'}`}>
-                                 {spinning ? '...' : myTurn ? 'SPIN' : 'WAIT'}
+                             <Trophy className={`w-10 h-10 ${myTurn && !spinning ? 'text-white' : 'text-slate-300'}`} />
+                             <span className={`text-xs font-black mt-1 tracking-[0.2em] uppercase ${myTurn && !spinning ? 'text-white' : 'text-slate-300'}`}>
+                                 {spinning ? '...' : myTurn ? 'Spin' : 'Wait'}
                              </span>
                          </button>
                      </motion.div>
 
-                     {/* Indicator */}
-                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 text-red-500 z-20">
-                         ▼
+                     {/* Indicator / Arrow */}
+                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
+                         <div className="w-0 h-0 border-l-[14px] border-r-[14px] border-b-[22px] border-l-transparent border-r-transparent border-b-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.9)]" />
+                         <div className="w-3 h-3 bg-yellow-300 rounded-full mx-auto -mt-1 shadow-[0_0_8px_rgba(250,204,21,0.9)]" />
                      </div>
 
                      {/* Result Display */}
@@ -208,11 +262,13 @@ const IPLDraftBoard = () => {
                          <div className="absolute inset-0 flex items-center justify-center z-30">
                              <motion.div 
                                 initial={{ scale: 0 }} animate={{ scale: 1 }}
-                                className="bg-black/90 p-6 rounded-2xl border-2 border-yellow-400 text-center"
+                                className="bg-black/90 px-8 py-5 rounded-2xl border-2 border-yellow-400 text-center shadow-[0_0_25px_rgba(250,204,21,0.5)]"
                              >
-                                 <p className="text-gray-400 text-sm mb-2">LANDED ON</p>
+                                 <p className="text-gray-300 text-xs tracking-[0.25em] uppercase mb-2">Landed On</p>
                                  <TeamBadge team={spinResult} size="lg" />
-                                 <p className="text-2xl font-bold mt-2">{spinResult}</p>
+                                 <p className="text-2xl font-extrabold mt-3 tracking-wide">
+                                     {spinResult === 'ANY' ? 'Any Team' : spinResult}
+                                 </p>
                              </motion.div>
                          </div>
                      )}
@@ -290,43 +346,88 @@ const IPLDraftBoard = () => {
                          <div className="bg-gray-900 w-full max-w-4xl h-[80vh] rounded-2xl border border-gray-700 shadow-2xl flex flex-col overflow-hidden">
                              <div className="p-6 border-b border-gray-700 flex justify-between items-center bg-gray-800">
                                  <div>
-                                     <h2 className="text-3xl font-bold flex items-center gap-3">
-                                         Select from <TeamBadge team={spinResult} />
-                                     </h2>
-                                     <p className="text-gray-400 mt-1">Pick 1 player for your squad</p>
+                                     {selectionMode === 'team' ? (
+                                         <>
+                                             <h2 className="text-3xl font-bold">Choose Team</h2>
+                                             <p className="text-gray-400 mt-1">Select an IPL team to pick from</p>
+                                         </>
+                                     ) : (
+                                         <>
+                                             <h2 className="text-3xl font-bold flex items-center gap-3">
+                                                 Select from <TeamBadge team={spinResult} />
+                                             </h2>
+                                             <p className="text-gray-400 mt-1">Pick 1 player for your squad</p>
+                                         </>
+                                     )}
                                  </div>
-                                 <button onClick={() => setShowPlayerSelect(false)} className="text-gray-500 hover:text-white">
+                                 <button 
+                                    onClick={() => {
+                                        setShowPlayerSelect(false);
+                                        setSelectionMode(null);
+                                        setAvailableTeamPlayers([]);
+                                    }} 
+                                    className="text-gray-500 hover:text-white"
+                                 >
                                      <X size={32} />
                                  </button>
                              </div>
                              
-                             <div className="flex-grow overflow-y-auto p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                 {availableTeamPlayers.map(p => (
-                                     <button 
-                                        key={p.id}
-                                        onClick={() => handlePick(p)}
-                                        className="bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-yellow-500 transition-all rounded-xl overflow-hidden group text-left relative flex flex-col"
-                                     >
-                                         <div className="h-40 bg-gray-700 relative overflow-hidden flex-shrink-0">
-                                             <img 
-                                                 src={p.image} 
-                                                 alt={p.name}
-                                                 onError={(e) => {
-                                                     e.target.onerror = null; 
-                                                     e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random&color=fff&size=256`;
-                                                 }}
-                                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform" 
-                                             />
-                                             <div className="absolute top-2 right-2">
-                                                 <span className="bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-md border border-white/10">{p.role}</span>
-                                             </div>
-                                         </div>
-                                         <div className="p-4 flex-grow flex flex-col justify-center">
-                                             <h3 className="font-bold text-lg leading-tight text-white group-hover:text-yellow-400">{p.name}</h3>
-                                             <p className="text-sm text-gray-400 mt-1">{p.team}</p>
-                                         </div>
-                                     </button>
-                                 ))}
+                             <div className="flex-grow overflow-y-auto p-6">
+                                 {selectionMode === 'team' ? (
+                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                         {TEAMS.filter(t => t !== 'ANY').map(team => {
+                                             const taken = myTeamCounts?.[team] || 0;
+                                             const disabled = taken >= 2;
+                                             return (
+                                                 <button
+                                                    key={team}
+                                                    disabled={disabled}
+                                                    onClick={() => handleAnyTeamChoice(team)}
+                                                    className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all ${
+                                                        disabled
+                                                            ? 'border-gray-700 bg-gray-800/60 text-gray-600 cursor-not-allowed'
+                                                            : 'border-gray-700 bg-gray-800 hover:border-yellow-500 hover:bg-gray-700 cursor-pointer'
+                                                    }`}
+                                                 >
+                                                     <TeamBadge team={team} size="lg" />
+                                                     <span className="mt-2 font-bold">{team}</span>
+                                                     <span className="mt-1 text-xs text-gray-400">
+                                                         {taken}/2 picked
+                                                     </span>
+                                                 </button>
+                                             );
+                                         })}
+                                     </div>
+                                 ) : (
+                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                         {availableTeamPlayers.map(p => (
+                                             <button 
+                                                key={p.id}
+                                                onClick={() => handlePick(p)}
+                                                className="bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-yellow-500 transition-all rounded-xl overflow-hidden group text-left relative flex flex-col"
+                                             >
+                                                 <div className="h-40 bg-gray-700 relative overflow-hidden flex-shrink-0">
+                                                     <img 
+                                                         src={p.image} 
+                                                         alt={p.name}
+                                                         onError={(e) => {
+                                                             e.target.onerror = null; 
+                                                             e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random&color=fff&size=256`;
+                                                         }}
+                                                         className="w-full h-full object-cover group-hover:scale-110 transition-transform" 
+                                                     />
+                                                     <div className="absolute top-2 right-2">
+                                                         <span className="bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-md border border-white/10">{p.role}</span>
+                                                     </div>
+                                                 </div>
+                                                 <div className="p-4 flex-grow flex flex-col justify-center">
+                                                     <h3 className="font-bold text-lg leading-tight text-white group-hover:text-yellow-400">{p.name}</h3>
+                                                     <p className="text-sm text-gray-400 mt-1">{p.team}</p>
+                                                 </div>
+                                             </button>
+                                         ))}
+                                     </div>
+                                 )}
                              </div>
                          </div>
                     </motion.div>

@@ -53,7 +53,12 @@ module.exports = (io, socket) => {
         roomCode, 
         isHost: true, 
         playerId: newPlayer._id,
-        gameType 
+        gameType,
+        gameHistory: room.gameHistory || [],
+        iplDraft: room.iplDraft || null,
+        currentTurn: room.turnIndex != null && room.players[room.turnIndex]
+          ? room.players[room.turnIndex].toString()
+          : null
       });
 
     } catch (err) {
@@ -98,7 +103,11 @@ module.exports = (io, socket) => {
         isHost: newPlayer.isHost, 
         playerId: newPlayer._id,
         gameType: room.gameType,
-        gameHistory: room.gameHistory || [] 
+        gameHistory: room.gameHistory || [],
+        iplDraft: room.iplDraft || null,
+        currentTurn: room.turnIndex != null && room.players[room.turnIndex]
+          ? room.players[room.turnIndex].toString()
+          : null
       });
 
     } catch (err) {
@@ -402,7 +411,11 @@ module.exports = (io, socket) => {
         isHost: player.isHost, 
         playerId: player._id,
         gameType: room.gameType,
-        gameHistory: room.gameHistory || []
+        gameHistory: room.gameHistory || [],
+        iplDraft: room.iplDraft || null,
+        currentTurn: room.turnIndex != null && room.players[room.turnIndex]
+          ? room.players[room.turnIndex].toString()
+          : null
       }); // Restore basic session
       socket.emit('updateGameState', { gameState: room.gameState, players: await Player.find({ roomCode }) });
       
